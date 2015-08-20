@@ -1,6 +1,8 @@
 Famous Engine
 =================
 
+[![Join the chat at https://gitter.im/infamous/engine](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/infamous/engine?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 [![Build Status](https://travis-ci.org/Famous/engine.svg?branch=master)](https://travis-ci.org/Famous/engine) [![Dependency Status](https://david-dm.org/Famous/engine.svg)](https://david-dm.org/Famous/engine) [![devDependency Status](https://david-dm.org/Famous/engine/dev-status.svg)](https://david-dm.org/Famous/engine#info=devDependencies)
 
 The Famous Engine is a free and open source JavaScript rendering engine. What makes the Famous Engine unique is its JavaScript rendering engine and 3D physics engine that gives developers the power and tools to build native quality apps and animations using pure JavaScript. It is designed to allow developers the ability to render to both DOM and WebGL in a unified API.

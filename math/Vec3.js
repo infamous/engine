@@ -33,7 +33,7 @@
  * @param {Number} y The y component.
  * @param {Number} z The z component.
  */
-var Vec3 = function(x ,y, z){
+var Vec3 = function(x, y, z){
     this.x = x || 0;
     this.y = y || 0;
     this.z = z || 0;
@@ -535,6 +535,38 @@ Vec3.scale = function scale(v, s, output) {
 };
 
 /**
+ * Scale and add the input Vec3.
+ *
+ * @method
+ *
+ * @param {Vec3} v The reference Vec3.
+ * @param {Number} s Number to scale by.
+ * @param {Vec3} output Vec3 in which to place the result.
+ *
+ * @return {Vec3} The result of the scaling.
+ */
+Vec3.prototype.scaleAndAdd = function scaleAndAdd(a, b, s) {
+    this.x = a.x + (b.x * s);
+    this.y = a.y + (b.y * s);
+    this.z = a.z + (b.z * s);
+};
+
+
+/**
+ * Calculates the squared euclidian distance between two vec3's
+ *
+ * @param {vec3} a the first operand
+ * @param {vec3} b the second operand
+ * @returns {Number} squared distance between a and b
+ */
+Vec3.prototype.squaredDistance = function squaredDistance(b) {
+    var x = b.x - this.x,
+        y = b.y - this.y,
+        z = b.z - this.z;
+    return x*x + y*y + z*z
+};
+
+/**
  * The dot product of the input Vec3's.
  *
  * @method
@@ -583,7 +615,7 @@ Vec3.cross = function cross(v1, v2, output) {
  * @param {Vec3} v2 The right Vec3.
  * @param {Vec3} output Vec3 in which to place the result.
  *
- * @return {Object} the object the result of the cross product was placed into 
+ * @return {Object} the object the result of the cross product was placed into
  */
 Vec3.project = function project(v1, v2, output) {
     var x1 = v1.x;
@@ -601,6 +633,12 @@ Vec3.project = function project(v1, v2, output) {
     output.z = z2 * scale;
 
     return output;
+};
+
+Vec3.prototype.createFromArray = function(a){
+    this.x = a[0] || 0;
+    this.y = a[1] || 0;
+    this.z = a[2] || 0;
 };
 
 module.exports = Vec3;

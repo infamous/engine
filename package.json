@@ -41,9 +41,9 @@
   "devDependencies": {
     "babel": "^5.8.21",
     "bluebird": "^2.9.34",
-    "browserify": "^10.2.1",
+    "browserify": "^11.0.0",
     "colors": "^1.1.0",
-    "eslint": "^0.21.2",
+    "eslint": "^0.24.1",
     "glob": "^5.0.10",
     "glslify": "^2.0.0",
     "istanbul": "^0.3.15",

@@ -56,28 +56,8 @@ Ray.prototype.at =  function ( t ) {
 
     return result.copy( this.direction ).scale( t ).add( this.origin );
 
-},
-
-
-Ray.prototype.intersectPlane = function(normal, dist) {
-  var tmp = new Vec3(0,0,0);
-  var o   = new Vec3(0,0,0);
-  var n   = new Vec3(normal[0],normal[1],normal[2]);
-  var out = new Vec3(0,0,0);
-  var d   = tmp.dot(this.direction,n);
-  if (d !== 0) {
-    var t = -(o.dot(this.origin, n) + dist) / d;
-    if (t < 0) {
-      return null
-    }
-    tmp = this.direction.scale(t);
-    return this.origin.add(out, tmp);
-} else if (tmp.dot(n, this.origin) + dist === 0) {
-    return this.origin;
-  } else {
-    return null;
-  }
 };
+
 
 Ray.prototype.intersectSphere = function (center, radius) {
 

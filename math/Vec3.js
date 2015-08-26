@@ -586,6 +586,12 @@ Vec3.prototype.squaredDistance = function squaredDistance(b) {
     return x*x + y*y + z*z
 };
 
+Vec3.prototype.distanceTo = function ( v ) {
+
+    return Math.sqrt( this.squaredDistance( v ) );
+
+};
+
 /**
  * The dot product of the input Vec3's.
  *

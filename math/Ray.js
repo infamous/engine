@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
- 
+
 var Vec3 = require('./Vec3');
 
 
@@ -50,8 +50,16 @@ Ray.prototype.copy = function ( ray ) {
 
 };
 
+Ray.prototype.at =  function ( t ) {
 
-Ray.prototype.intersectsPlane = function(normal, dist) {
+    var result = new Vec3();
+
+    return result.copy( this.direction ).scale( t ).add( this.origin );
+
+},
+
+
+Ray.prototype.intersectPlane = function(normal, dist) {
   var tmp = new Vec3(0,0,0);
   var o   = new Vec3(0,0,0);
   var n   = new Vec3(normal[0],normal[1],normal[2]);
@@ -71,31 +79,45 @@ Ray.prototype.intersectsPlane = function(normal, dist) {
   }
 };
 
-Ray.prototype.intersectsSphere = function(center, radius) {
+Ray.prototype.intersectSphere = function (center, radius) {
 
-  var c   = new Vec3(center[0],center[1],center[2]);
-  var out = new Vec3(0,0,0);
-  var tmp = c.subtract(this.origin);
-  var len = tmp.dot(this.direction);
+	// from http://www.scratchapixel.com/lessons/3d-basic-lessons/lesson-7-intersecting-simple-shapes/ray-sphere-intersection/
 
-  if (len < 0) { // sphere is behind the ray
-    return null;
-  }
+	var vec = new Vec3();
+    var c = new Vec3(center[0],center[1],center[2]);
 
-  tmp.scaleAndAdd(this.origin, this.direction, len);
+	vec.subVectors( c, this.origin );
 
-  var dSq = tmp.squaredDistance(c);
-  var rSq = radius * radius;
-  if (dSq > rSq) {
-    return null;
-  }
+	var tca = vec.dot( this.direction );
 
-  out = this.direction.scale(len - Math.sqrt(rSq - dSq));
-  return out.add(out, this.origin, out);
+	var d2 = vec.dot( vec ) - tca * tca;
+
+	var radius2 = radius * radius;
+
+	if ( d2 > radius2 ) return null;
+
+	var thc = Math.sqrt( radius2 - d2 );
+
+	// t0 = first intersect point - entrance on front of sphere
+	var t0 = tca - thc;
+
+	// t1 = second intersect point - exit point on back of sphere
+	var t1 = tca + thc;
+
+	// test to see if both t0 and t1 are behind the ray - if so, return null
+	if ( t0 < 0 && t1 < 0 ) return null;
+
+	// test to see if t0 is behind the ray:
+	// if it is, the ray is inside the sphere, so return the second exit point scaled by t1,
+	// in order to always return an intersect point that is in front of the ray.
+	if ( t0 < 0 ) return this.at( t1 );
+
+	// else t0 is in front of the ray, so return the first collision point scaled by t0
+	return this.at( t0 );
 
 };
 
-Ray.prototype.intersectsBox = function(center, size) {
+Ray.prototype.intersectBox = function(center, size) {
 
     var tmin,
         tmax,
@@ -146,9 +168,6 @@ Ray.prototype.intersectsBox = function(center, size) {
 
     if ( ( tmin > tymax ) || ( tymin > tmax ) ) return null;
 
-    // These lines also handle the case where tmin or tmax is NaN
-    // (result of 0 * Infinity). x !== x returns true if x is NaN
-
     if ( tymin > tmin || tmin !== tmin ) tmin = tymin;
 
     if ( tymax < tmax || tmax !== tmax ) tmax = tymax;
@@ -170,7 +189,6 @@ Ray.prototype.intersectsBox = function(center, size) {
 
     if ( tzmax < tmax || tmax !== tmax ) tmax = tzmax;
 
-    //return point closest to the ray (positive side)
 
     if ( tmax < 0 ) return null;
 

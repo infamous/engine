@@ -93,6 +93,26 @@ Vec3.prototype.subtract = function subtract(v) {
 };
 
 /**
+ * Subtract the input a from b and create new vector.
+ *
+ * @method
+ *
+ * @param {Vec3} a The Vec3 to subtract.
+ * @param {Vec3} b The Vec3 to subtract.
+ *
+ * @return {Vec3} this
+ */
+Vec3.prototype.subVectors = function ( a, b ) {
+
+	this.x = a.x - b.x;
+	this.y = a.y - b.y;
+	this.z = a.z - b.z;
+
+	return this;
+
+};
+
+/**
  * Rotate the current Vec3 by theta clockwise about the x axis.
  *
  * @method

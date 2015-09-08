@@ -1,0 +1,84 @@
+/**
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2015 Famous Industries Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+'use strict';
+
+import { Light } from './Light';
+import { TransformSystem } from '../../core/TransformSystem';
+
+/**
+ * PointLight extends the functionality of Light. PointLight is a light source
+ * that emits light in all directions from a point in space.
+ *
+ * @class PointLight
+ * @constructor
+ * @augments Light
+ *
+ * @param {Node} node LocalDispatch to be retrieved from the corresponding Render Node
+ *
+ * @return {undefined} undefined
+ */
+class PointLight extends Light {
+  constructor(node) {
+    super(node);
+  }
+
+  /**
+   * Receive the notice that the node you are on has been mounted.
+   *
+   * @param {Node} node Node that the component has been associated with
+   * @param {Number} id ID associated with the node
+   *
+   * @return {undefined} undefined
+   */
+  onMount(node, id) {
+    this._id = id;
+    TransformSystem.makeBreakPointAt(this._node.getLocation());
+    this.onTransformChange(TransformSystem.get(this._node.getLocation()));
+  };
+
+  /**
+   * Receives transform change updates from the scene graph.
+   *
+   * @private
+   *
+   * @param {Array} transform Transform matrix
+   *
+   * @return {undefined} undefined
+   */
+  onTransformChange(transform) {
+    if (!this._requestingUpdate) {
+      this._node.requestUpdate(this._id);
+      this._requestingUpdate = true;
+    }
+    transform = transform.getWorldTransform();
+    this.queue.push(this.commands.position);
+    this.queue.push(transform[12]);
+    this.queue.push(transform[13]);
+    this.queue.push(transform[14]);
+  };
+
+}
+
+export { PointLight };

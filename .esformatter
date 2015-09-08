@@ -1,0 +1,7 @@
+// esformatter -i ./src/**/*.js
+{
+  "plugins": ["esformatter-quotes"],
+  "quotes": {
+    "type": "single"
+  }
+}

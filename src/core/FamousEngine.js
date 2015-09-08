@@ -1,0 +1,480 @@
+/**
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2015 Famous Industries Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+'use strict';
+
+import { Clock } from './Clock';
+import { Scene } from './Scene';
+import { Channel } from './Channel';
+import { Dispatch } from './Dispatch';
+import { UIManager } from '../renderers/UIManager';
+import { Compositor } from '../renderers/Compositor';
+import { RequestAnimationFrameLoop } from '../render-loops/RequestAnimationFrameLoop';
+import { TransformSystem } from './TransformSystem';
+import { OpacitySystem } from './OpacitySystem';
+import { SizeSystem } from './SizeSystem';
+import { Commands } from './Commands';
+
+var ENGINE_START = [Commands.ENGINE, Commands.START];
+var ENGINE_STOP = [Commands.ENGINE, Commands.STOP];
+var TIME_UPDATE = [Commands.TIME, null];
+
+/**
+ * Famous has two responsibilities, one to act as the highest level
+ * updater and another to send messages over to the renderers. It is
+ * a singleton.
+ *
+ * @class FamousEngine
+ * @constructor
+ */
+class FamousEngine {
+  constructor() {
+    var _this = this;
+
+    Dispatch._setUpdater(this);
+
+    this._updateQueue = []; // The updateQueue is a place where nodes
+    // can place themselves in order to be
+    // updated on the frame.
+
+    this._nextUpdateQueue = []; // the nextUpdateQueue is used to queue
+    // updates for the next tick.
+    // this prevents infinite loops where during
+    // an update a node continuously puts itself
+    // back in the update queue.
+
+    this._scenes = {}; // a hash of all of the scenes's that the FamousEngine
+    // is responsible for.
+
+    this._messages = TIME_UPDATE; // a queue of all of the draw commands to
+    // send to the the renderers this frame.
+
+    this._inUpdate = false; // when the famous is updating this is true.
+    // all requests for updates will get put in the
+    // nextUpdateQueue
+
+    this._clock = new Clock(); // a clock to keep track of time for the scene
+    // graph.
+
+
+    this._channel = new Channel();
+    this._channel.onMessage = function(message) {
+      _this.handleMessage(message);
+    };
+  }
+
+
+  /**
+   * An init script that initializes the FamousEngine with options
+   * or default parameters.
+   *
+   * @method
+   *
+   * @param {Object} options a set of options containing a compositor and a render loop
+   *
+   * @return {FamousEngine} this
+   */
+  init(options) {
+    if (typeof window === 'undefined') {
+      throw new Error(
+        'FamousEngine#init needs to have access to the global window object. ' +
+        'Instantiate Compositor and UIManager manually in the UI thread.'
+      );
+    }
+    this.compositor = options && options.compositor || new Compositor();
+    this.renderLoop = options && options.renderLoop || new RequestAnimationFrameLoop();
+    this.uiManager = new UIManager(this.getChannel(), this.compositor, this.renderLoop);
+    return this;
+  };
+
+  /**
+   * Sets the channel that the engine will use to communicate to
+   * the renderers.
+   *
+   * @method
+   *
+   * @param {Channel} channel     The channel to be used for communicating with
+   *                              the `UIManager`/ `Compositor`.
+   *
+   * @return {FamousEngine} this
+   */
+  setChannel(channel) {
+    this._channel = channel;
+    return this;
+  };
+
+  /**
+   * Returns the channel that the engine is currently using
+   * to communicate with the renderers.
+   *
+   * @method
+   *
+   * @return {Channel} channel    The channel to be used for communicating with
+   *                              the `UIManager`/ `Compositor`.
+   */
+  getChannel() {
+    return this._channel;
+  };
+
+  /**
+   * _update is the body of the update loop. The frame consists of
+   * pulling in appending the nextUpdateQueue to the currentUpdate queue
+   * then moving through the updateQueue and calling onUpdate with the current
+   * time on all nodes. While _update is called _inUpdate is set to true and
+   * all requests to be placed in the update queue will be forwarded to the
+   * nextUpdateQueue.
+   *
+   * @method
+   *
+   * @return {undefined} undefined
+   */
+  _update() {
+    this._inUpdate = true;
+    var time = this._clock.now();
+    var nextQueue = this._nextUpdateQueue;
+    var queue = this._updateQueue;
+    var item;
+
+    this._messages[1] = time;
+
+    SizeSystem.update();
+    TransformSystem.update();
+    OpacitySystem.update();
+
+    while (nextQueue.length) queue.unshift(nextQueue.pop());
+
+    while (queue.length) {
+      item = queue.shift();
+      if (item && item.update) item.update(time);
+      if (item && item.onUpdate) item.onUpdate(time);
+    }
+
+    this._inUpdate = false;
+  };
+
+  /**
+   * requestUpdates takes a class that has an onUpdate method and puts it
+   * into the updateQueue to be updated at the next frame.
+   * If FamousEngine is currently in an update, requestUpdate
+   * passes its argument to requestUpdateOnNextTick.
+   *
+   * @method
+   *
+   * @param {Object} requester an object with an onUpdate method
+   *
+   * @return {undefined} undefined
+   */
+  requestUpdate(requester) {
+    if (!requester)
+      throw new Error(
+        'requestUpdate must be called with a class to be updated'
+      );
+
+    if (this._inUpdate) this.requestUpdateOnNextTick(requester);
+    else this._updateQueue.push(requester);
+  };
+
+  /**
+   * requestUpdateOnNextTick is requests an update on the next frame.
+   * If FamousEngine is not currently in an update than it is functionally equivalent
+   * to requestUpdate. This method should be used to prevent infinite loops where
+   * a class is updated on the frame but needs to be updated again next frame.
+   *
+   * @method
+   *
+   * @param {Object} requester an object with an onUpdate method
+   *
+   * @return {undefined} undefined
+   */
+  requestUpdateOnNextTick(requester) {
+    this._nextUpdateQueue.push(requester);
+  };
+
+  /**
+   * postMessage sends a message queue into FamousEngine to be processed.
+   * These messages will be interpreted and sent into the scene graph
+   * as events if necessary.
+   *
+   * @method
+   *
+   * @param {Array} messages an array of commands.
+   *
+   * @return {FamousEngine} this
+   */
+  handleMessage(messages) {
+    if (!messages)
+      throw new Error(
+        'onMessage must be called with an array of messages'
+      );
+
+    var command;
+
+    while (messages.length > 0) {
+      command = messages.shift();
+      switch (command) {
+        case Commands.WITH:
+          this.handleWith(messages);
+          break;
+        case Commands.FRAME:
+          this.handleFrame(messages);
+          break;
+        default:
+          throw new Error('received unknown command: ' + command);
+      }
+    }
+    return this;
+  };
+
+  /**
+   * handleWith is a method that takes an array of messages following the
+   * WITH command. It'll then issue the next commands to the path specified
+   * by the WITH command.
+   *
+   * @method
+   *
+   * @param {Array} messages array of messages.
+   *
+   * @return {FamousEngine} this
+   */
+  handleWith(messages) {
+    var path = messages.shift();
+    var command = messages.shift();
+    switch (command) {
+      case Commands.TRIGGER: // the TRIGGER command sends a UIEvent to the specified path
+        var type = messages.shift();
+        var ev = messages.shift();
+        Dispatch.dispatchUIEvent(path, type, ev);
+        break;
+      default:
+        throw new Error('received unknown command: ' + command);
+    }
+    return this;
+  };
+
+  /**
+   * handleFrame is called when the renderers issue a FRAME command to
+   * FamousEngine. FamousEngine will then step updating the scene graph to the current time.
+   *
+   * @method
+   *
+   * @param {Array} messages array of messages.
+   *
+   * @return {FamousEngine} this
+   */
+  handleFrame(messages) {
+    if (!messages)
+      throw new Error('handleFrame must be called with an array of messages');
+    if (!messages.length)
+      throw new Error('FRAME must be sent with a time');
+
+    this.step(messages.shift());
+    return this;
+  };
+
+  /**
+   * step updates the clock and the scene graph and then sends the draw commands
+   * that accumulated in the update to the renderers.
+   *
+   * @method
+   *
+   * @param {Number} time current engine time
+   *
+   * @return {FamousEngine} this
+   */
+  step(time) {
+    if (time == null)
+      throw new Error('step must be called with a time');
+
+    this._clock.step(time);
+    this._update();
+
+    if (this._messages.length) {
+      this._channel.sendMessage(this._messages);
+      while (this._messages.length > 2) this._messages.pop();
+    }
+
+    return this;
+  };
+
+  /**
+   * returns the context of a particular path. The context is looked up by the selector
+   * portion of the path and is listed from the start of the string to the first
+   * '/'.
+   *
+   * @method
+   *
+   * @param {String} selector the path to look up the context for.
+   *
+   * @return {Context | Undefined} the context if found, else undefined.
+   */
+  getContext(selector) {
+    if (!selector)
+      throw new Error('getContext must be called with a selector');
+
+    var index = selector.indexOf('/');
+    selector = index === -1 ? selector : selector.substring(0, index);
+
+    return this._scenes[selector];
+  };
+
+  /**
+   * Returns the instance of clock used by the FamousEngine.
+   *
+   * @method
+   *
+   * @return {Clock} FamousEngine's clock
+   */
+  getClock() {
+    return this._clock;
+  };
+
+  /**
+   * Enqueues a message to be transfered to the renderers.
+   *
+   * @method
+   *
+   * @param {Any} command Draw Command
+   *
+   * @return {FamousEngine} this
+   */
+  message(command) {
+    this._messages.push(command);
+    return this;
+  };
+
+  /**
+   * Creates a scene under which a scene graph could be built.
+   *
+   * @method
+   *
+   * @param {String} selector a dom selector for where the scene should be placed
+   *
+   * @return {Scene} a new instance of Scene.
+   */
+  createScene(selector) {
+    selector = selector || 'body';
+
+    if (this._scenes[selector]) this._scenes[selector].dismount();
+    this._scenes[selector] = new Scene(selector, this);
+    return this._scenes[selector];
+  };
+
+  /**
+   * Introduce an already instantiated scene to the engine.
+   *
+   * @method
+   *
+   * @param {Scene} scene the scene to reintroduce to the engine
+   *
+   * @return {FamousEngine} this
+   */
+  addScene(scene) {
+    var selector = scene._selector;
+
+    var current = this._scenes[selector];
+    if (current && current !== scene) current.dismount();
+    if (!scene.isMounted()) scene.mount(scene.getSelector());
+    this._scenes[selector] = scene;
+    return this;
+  };
+
+  /**
+   * Remove a scene.
+   *
+   * @method
+   *
+   * @param {Scene} scene the scene to remove from the engine
+   *
+   * @return {FamousEngine} this
+   */
+  removeScene(scene) {
+    var selector = scene._selector;
+
+    var current = this._scenes[selector];
+    if (current && current === scene) {
+      if (scene.isMounted()) scene.dismount();
+      delete this._scenes[selector]
+      ;
+    }
+    return this;
+  };
+
+  /**
+   * Starts the engine running in the Main-Thread.
+   * This effects **every** updateable managed by the Engine.
+   *
+   * @method
+   *
+   * @return {FamousEngine} this
+   */
+  startRenderLoop() {
+    this._channel.sendMessage(ENGINE_START);
+    return this;
+  };
+
+  /**
+   * Stops the engine running in the Main-Thread.
+   * This effects **every** updateable managed by the Engine.
+   *
+   * @method
+   *
+   * @return {FamousEngine} this
+   */
+  stopRenderLoop() {
+    this._channel.sendMessage(ENGINE_STOP);
+    return this;
+  };
+
+  /**
+   * @method
+   * @deprecated Use {@link FamousEngine#startRenderLoop} instead!
+   *
+   * @return {FamousEngine} this
+   */
+  startEngine() {
+    console.warn(
+      'FamousEngine.startEngine is deprecated! Use ' +
+      'FamousEngine.startRenderLoop instead!'
+    );
+    return this.startRenderLoop();
+  };
+
+  /**
+   * @method
+   * @deprecated Use {@link FamousEngine#stopRenderLoop} instead!
+   *
+   * @return {FamousEngine} this
+   */
+  stopEngine() {
+    console.warn(
+      'FamousEngine.stopEngine is deprecated! Use ' +
+      'FamousEngine.stopRenderLoop instead!'
+    );
+    return this.stopRenderLoop();
+  };
+
+}
+
+var newFamousEngine = new FamousEngine();
+export { newFamousEngine as FamousEngine };

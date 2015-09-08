@@ -2,31 +2,35 @@
   "name": "infamous-engine",
   "version": "0.7.1-d.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
     "tape": "tap-closer | smokestack -b firefox | tap-spec",
-    "test-new": "node ./scripts/test.js ./core/**/*.spec.js",
-    "test-components": "browserify components/test/*.js | npm run tape",
+    "test-new": "node ./test/scripts/test.js ./test/core/**/*.spec.js",
+    "test-components": "node ./test/scripts/test.js ./test/components/**/*.js",
     "test-core": "npm run test-new",
-    "test-dom-renderables": "browserify dom-renderables/test/*.js | npm run tape",
-    "test-dom-renderers": "browserify dom-renderers/test/*.js | npm run tape",
-    "test-render-loops": "browserify render-loops/test/*.js | npm run tape",
-    "test-math": "browserify math/test/*.js | npm run tape",
-    "test-physics": "browserify physics/test/*.js physics/test/*/*.js | npm run tape",
-    "test-polyfills": "browserify polyfills/test/*.js | npm run tape",
-    "test-renderers": "browserify renderers/test/*.js | npm run tape",
-    "test-transitions": "browserify transitions/test/*.js | npm run tape",
-    "test-utilities": "browserify utilities/test/*.js | npm run tape",
-    "test-webgl-geometries": "browserify webgl-geometries/test/*.js | npm run tape",
-    "test-webgl-materials": "browserify webgl-materials/test/*.js | npm run tape",
-    "test-webgl-renderables": "browserify webgl-renderables/test/*.js | npm run tape",
-    "test-webgl-renderers": "browserify webgl-renderers/test/*.js | npm run tape",
+    "test-dom-renderables": "node ./test/scripts/test.js ./test/dom-renderables/*.js",
+    "test-dom-renderers": "node ./test/scripts/test.js ./test/dom-renderers/*.js",
+    "test-render-loops": "node ./test/scripts/test.js ./test/render-loops/*.js",
+    "test-math": "node ./test/scripts/test.js ./test/math/*.js",
+    "test-physics": "node ./test/scripts/test.js ./test/physics/**/*.spec.js",
+    "test-polyfills": "node ./test/scripts/test.js ./test/polyfills/*.js",
+    "test-renderers": "node ./test/scripts/test.js ./test/renderers/*.js",
+    "test-transitions": "node ./test/scripts/test.js ./test/transitions/*.js",
+    "test-utilities": "node ./test/scripts/test.js ./test/utilities/*.js",
+    "test-webgl-geometries": "node ./test/scripts/test.js ./test/webgl-geometries/*.js",
+    "test-webgl-materials": "node ./test/scripts/test.js ./test/webgl-materials/*.js",
+    "test-webgl-renderables": "node ./test/scripts/test.js ./test/webgl-renderables/*.js",
+    "test-webgl-renderers": "node ./test/scripts/test.js ./test/webgl-renderers/*.js",
     "test": "EXIT_STATUS=0; npm run test-components || EXIT_STATUS=$?; npm run test-core || EXIT_STATUS=$?; npm run test-dom-renderables || EXIT_STATUS=$?; npm run test-dom-renderers || EXIT_STATUS=$?; npm run test-render-loops || EXIT_STATUS=$?; npm run test-math || EXIT_STATUS=$?; npm run test-physics || EXIT_STATUS=$?; npm run test-polyfills || EXIT_STATUS=$?; npm run test-renderers || EXIT_STATUS=$?; npm run test-transitions || EXIT_STATUS=$?; npm run test-utilities || EXIT_STATUS=$?; npm run test-webgl-geometries || EXIT_STATUS=$?; npm run test-webgl-materials || EXIT_STATUS=$?; npm run test-webgl-renderables || EXIT_STATUS=$?; npm run test-webgl-renderers; exit $EXIT_STATUS",
-    "check-jsdoc": "eslint --reset --no-eslintrc --rule 'valid-jsdoc: 2' --ignore-path .gitignore .",
-    "lint": "eslint --ignore-path .gitignore .",
-    "build": "npm run build-debug && npm run build-min",
-    "build-debug": "browserify index.js -d --standalone famous > dist/famous.js",
-    "build-min": "browserify index.js --standalone famous | uglifyjs --screw-ie8 -m -c dead_code,sequences,conditionals,booleans,unused,if_return,join_vars,drop_debugger > dist/famous.min.js"
+    "check-jsdoc": "eslint --reset --no-eslintrc --rule 'valid-jsdoc: 2' --ignore-path .gitignore ./src",
+    "lint": "eslint --ignore-path .gitignore ./src",
+    "build": "npm run build-commonjs && npm run build-debug && npm run build-min",
+    "build-debug": "browserify dist/commonjs/index.js -d --standalone famous > dist/famous.js",
+    "build-min": "browserify dist/commonjs/index.js --standalone famous | uglifyjs --screw-ie8 -m -c dead_code,sequences,conditionals,booleans,unused,if_return,join_vars,drop_debugger > dist/famous.min.js",
+    "build-glsl": "node ./bin/compile-glsl.js",
+    "build-commonjs": "npm run build-glsl && babel ./src --out-dir ./dist/commonjs --modules common",
+    "build-amd": "npm run build-glsl && babel ./src --out-dir ./dist/amd --modules amd",
+    "build-umd": "npm run build-glsl && babel ./src --out-dir ./dist/umd --modules umd"
   },
   "repository": {
     "type": "git",
@@ -35,10 +39,15 @@
   "author": "Famous",
   "license": "MIT",
   "devDependencies": {
-    "browserify": "^11.0.0",
+    "babel": "^5.8.21",
+    "babelify": "^6.2.0",
+    "browserify": "^11.0.1",
     "colors": "^1.1.0",
+    "esformatter": "^0.7.3",
+    "esformatter-quotes": "^1.0.3",
     "eslint": "^0.24.1",
     "glob": "^5.0.10",
+    "glslify": "^2.0.0",
     "istanbul": "^0.3.15",
     "rewire": "^2.3.3",
     "sinon": "^1.14.1",
@@ -48,12 +57,18 @@
     "tape": "^4.0.0",
     "uglify-js": "^2.4.17"
   },
-  "dependencies": {
-    "glslify": "^2.0.0"
-  },
+  "dependencies": {},
   "browserify": {
     "transform": [
-      "glslify"
+      "babelify"
     ]
+  },
+  "esformatter": {
+    "plugins": [
+      "esformatter-quotes"
+    ],
+    "quotes": {
+      "type": "single"
+    }
   }
 }
